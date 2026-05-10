@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts - System Monitoring{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-0">
+            <i class="fas fa-exclamation-circle"></i> System Alerts
+        </h2>
+        <small class="text-muted">View and manage system alerts</small>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if alerts %}
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Type</th>
+                        <th>Severity</th>
+                        <th>Message</th>
+                        <th>Value / Threshold</th>
+                        <th>Status</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for alert in alerts %}
+                        <tr>
+                            <td><small>{{ alert.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</small></td>
+                            <td><strong>{{ alert.alert_type }}</strong></td>
+                            <td>
+                                {% if alert.severity == 'CRITICAL' %}
+                                    <span class="badge bg-danger">{{ alert.severity }}</span>
+                                {% elif alert.severity == 'WARNING' %}
+                                    <span class="badge bg-warning text-dark">{{ alert.severity }}</span>
+                                {% else %}
+                                    <span class="badge bg-info">{{ alert.severity }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ alert.message }}</td>
+                            <td>
+                                <small>
+                                    {% if alert.current_value is not none and alert.threshold_value is not none %}
+                                        {{ "%.1f"|format(alert.current_value) }} / {{ "%.1f"|format(alert.threshold_value) }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </small>
+                            </td>
+                            <td>
+                                {% if alert.is_resolved %}
+                                    <span class="badge bg-success">Resolved</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Unresolved</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if not alert.is_resolved %}
+                                    <button class="btn btn-sm btn-outline-success" onclick="resolveAlert({{ alert.id }})">
+                                        <i class="fas fa-check"></i> Resolve
+                                    </button>
+                                {% else %}
+                                    <small class="text-muted">{{ alert.resolved_at.strftime('%H:%M:%S') }}</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            {% if total_pages > 1 %}
+                <nav class="p-3 border-top">
+                    <ul class="pagination mb-0 justify-content-center">
+                        {% if page > 1 %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page - 1 }}">Previous</a>
+                            </li>
+                        {% endif %}
+
+                        {% for p in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                            <li class="page-item {% if p == page %}active{% endif %}">
+                                <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+                            </li>
+                        {% endfor %}
+
+                        {% if page < total_pages %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page + 1 }}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ total_pages }}">Last</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="p-5 text-center text-muted">
+                <i class="fas fa-check-circle fa-4x mb-3 opacity-50"></i>
+                <h4>No Alerts Found</h4>
+                <p>All systems are operating normally</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function resolveAlert(alertId) {
+    if (confirm('Mark this alert as resolved?')) {
+        fetch(`/api/alerts/resolve/${alertId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                location.reload();
+            } else {
+                alert('Error resolving alert: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error resolving alert');
+        });
+    }
+}
+</script>
+{% endblock %}

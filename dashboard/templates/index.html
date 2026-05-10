@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - System Monitoring{% endblock %}
+
+{% block extra_css %}
+<style>
+    .metric-card {
+        border-left: 4px solid #0d6efd;
+        transition: transform 0.2s;
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+    }
+    .gauge-container {
+        position: relative;
+        width: 150px;
+        height: 150px;
+        margin: 0 auto;
+    }
+    .gauge-value {
+        font-size: 2.5rem;
+        font-weight: bold;
+        color: #333;
+    }
+    .status-ok { color: #28a745; }
+    .status-warning { color: #ffc107; }
+    .status-critical { color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h1 class="mb-0">
+            <i class="fas fa-tachometer-alt"></i> System Monitoring Dashboard
+        </h1>
+        <small class="text-muted">Real-time system metrics and status</small>
+    </div>
+</div>
+
+<!-- System Status Cards -->
+<div class="row mb-4">
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card metric-card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="card-title mb-2 text-muted">CPU Usage</h6>
+                        <div class="gauge-value status-{{ 'critical' if metric and metric.cpu_usage > 85 else 'warning' if metric and metric.cpu_usage > 70 else 'ok' }}">
+                            {% if metric %}{{ "%.1f"|format(metric.cpu_usage) }}%{% else %}N/A{% endif %}
+                        </div>
+                        <small class="text-muted">{{ metric.cpu_cores if metric else 0 }} cores</small>
+                    </div>
+                    <div class="text-end">
+                        <i class="fas fa-microchip fa-3x text-primary opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card metric-card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="card-title mb-2 text-muted">Memory Usage</h6>
+                        <div class="gauge-value status-{{ 'critical' if metric and metric.memory_usage > 90 else 'warning' if metric and metric.memory_usage > 80 else 'ok' }}">
+                            {% if metric %}{{ "%.1f"|format(metric.memory_usage) }}%{% else %}N/A{% endif %}
+                        </div>
+                        <small class="text-muted">
+                            {% if metric %}{{ metric.memory_used_mb|int }} / {{ metric.memory_total_mb|int }} MB{% else %}N/A{% endif %}
+                        </small>
+                    </div>
+                    <div class="text-end">
+                        <i class="fas fa-server fa-3x text-info opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card metric-card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="card-title mb-2 text-muted">Disk Usage</h6>
+                        <div class="gauge-value status-{{ 'critical' if metric and metric.disk_usage > 95 else 'warning' if metric and metric.disk_usage > 80 else 'ok' }}">
+                            {% if metric %}{{ "%.1f"|format(metric.disk_usage) }}%{% else %}N/A{% endif %}
+                        </div>
+                        <small class="text-muted">
+                            {% if metric %}{{ metric.disk_used_gb|int }} / {{ metric.disk_total_gb|int }} GB{% else %}N/A{% endif %}
+                        </small>
+                    </div>
+                    <div class="text-end">
+                        <i class="fas fa-hdd fa-3x text-success opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6 mb-3">
+        <div class="card metric-card shadow-sm">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <h6 class="card-title mb-2 text-muted">System Uptime</h6>
+                        <div class="gauge-value">{{ uptime }}</div>
+                        <small class="text-muted">Running</small>
+                    </div>
+                    <div class="text-end">
+                        <i class="fas fa-clock fa-3x text-warning opacity-50"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="row mb-4">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-chart-line"></i> System Metrics (Last 24 Hours)
+                </h5>
+            </div>
+            <div class="card-body">
+                <canvas id="metricsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card shadow-sm mb-3">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-microchip"></i> Load Average
+                </h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr>
+                        <td>1 Minute</td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(metric.load_average_1m) if metric else 'N/A' }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>5 Minutes</td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(metric.load_average_5m) if metric else 'N/A' }}</strong></td>
+                    </tr>
+                    <tr>
+                        <td>15 Minutes</td>
+                        <td class="text-end"><strong>{{ "%.2f"|format(metric.load_average_15m) if metric else 'N/A' }}</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-info-circle"></i> System Info
+                </h5>
+            </div>
+            <div class="card-body">
+                <small class="text-muted">Last Updated:</small>
+                <div class="text-xs mb-2">{{ metric.timestamp.strftime('%Y-%m-%d %H:%M:%S') if metric else 'N/A' }}</div>
+                <small class="text-muted">CPU Cores:</small>
+                <div class="text-xs mb-2">{{ metric.cpu_cores if metric else 'N/A' }}</div>
+                <small class="text-muted">Total Memory:</small>
+                <div class="text-xs">{{ metric.memory_total_mb|int if metric else 'N/A' }} MB</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Data -->
+<div class="row mb-4">
+    <!-- Recent Alerts -->
+    <div class="col-lg-6 mb-3">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-bell"></i> Recent Alerts
+                </h5>
+                <a href="/alerts" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                {% if alerts %}
+                    <div class="list-group list-group-flush">
+                        {% for alert in alerts %}
+                            <div class="list-group-item list-group-item-action">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <h6 class="mb-1">
+                                            {% if alert.severity == 'CRITICAL' %}
+                                                <span class="badge bg-danger">{{ alert.severity }}</span>
+                                            {% elif alert.severity == 'WARNING' %}
+                                                <span class="badge bg-warning">{{ alert.severity }}</span>
+                                            {% else %}
+                                                <span class="badge bg-info">{{ alert.severity }}</span>
+                                            {% endif %}
+                                            {{ alert.alert_type }}
+                                        </h6>
+                                        <p class="mb-0 small text-muted">{{ alert.message }}</p>
+                                    </div>
+                                    <small class="text-muted">{{ alert.created_at.strftime('%H:%M:%S') }}</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="p-3 text-center text-muted">
+                        <i class="fas fa-check-circle fa-2x mb-2"></i>
+                        <p>No recent alerts</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Processes -->
+    <div class="col-lg-6 mb-3">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-tasks"></i> Top Processes
+                </h5>
+            </div>
+            <div class="card-body">
+                <h6 class="text-muted small mb-2">By CPU Usage</h6>
+                {% if top_procs.cpu %}
+                    <div class="list-group list-group-sm mb-3">
+                        {% for proc in top_procs.cpu[:3] %}
+                            <div class="list-group-item d-flex justify-content-between small">
+                                <span>{{ proc.process_name }}</span>
+                                <strong>{{ "%.1f"|format(proc.cpu_usage) }}%</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <h6 class="text-muted small mb-2">By Memory Usage</h6>
+                {% if top_procs.memory %}
+                    <div class="list-group list-group-sm">
+                        {% for proc in top_procs.memory[:3] %}
+                            <div class="list-group-item d-flex justify-content-between small">
+                                <span>{{ proc.process_name }}</span>
+                                <strong>{{ "%.1f"|format(proc.memory_usage) }}%</strong>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Logs -->
+<div class="row">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">
+                    <i class="fas fa-file-alt"></i> Recent Logs
+                </h5>
+                <a href="/logs" class="btn btn-sm btn-outline-primary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                {% if logs %}
+                    <table class="table table-hover mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>Type</th>
+                                <th>Level</th>
+                                <th>Message</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs %}
+                                <tr>
+                                    <td><small>{{ log.created_at.strftime('%H:%M:%S') }}</small></td>
+                                    <td><small class="badge bg-secondary">{{ log.log_type }}</small></td>
+                                    <td>
+                                        {% if log.level == 'ERROR' %}
+                                            <small class="badge bg-danger">{{ log.level }}</small>
+                                        {% elif log.level == 'WARNING' %}
+                                            <small class="badge bg-warning text-dark">{{ log.level }}</small>
+                                        {% else %}
+                                            <small class="badge bg-info">{{ log.level }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td><small>{{ log.message[:80] }}{% if log.message|length > 80 %}...{% endif %}</small></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <div class="p-3 text-center text-muted">
+                        <p>No recent logs</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Fetch and render metrics chart
+    fetch('/api/metrics/chart')
+        .then(response => response.json())
+        .then(data => {
+            const ctx = document.getElementById('metricsChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.timestamps,
+                    datasets: [
+                        {
+                            label: 'CPU Usage (%)',
+                            data: data.cpu,
+                            borderColor: '#0d6efd',
+                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Memory Usage (%)',
+                            data: data.memory,
+                            borderColor: '#20c997',
+                            backgroundColor: 'rgba(32, 201, 151, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Disk Usage (%)',
+                            data: data.disk,
+                            borderColor: '#ffc107',
+                            backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    }
+                }
+            });
+        })
+        .catch(error => console.error('Error loading chart:', error));
+    
+    // Update alert count
+    updateAlertCount();
+    setInterval(updateAlertCount, 30000);
+});
+
+function updateAlertCount() {
+    fetch('/api/stats')
+        .then(response => response.json())
+        .then(data => {
+            const alertBadge = document.getElementById('alert-count');
+            if (alertBadge) {
+                alertBadge.textContent = data.unresolved_alerts;
+            }
+        })
+        .catch(error => console.error('Error updating alert count:', error));
+}
+</script>
+{% endblock %}

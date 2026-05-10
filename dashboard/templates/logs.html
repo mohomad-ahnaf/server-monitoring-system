@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Logs - System Monitoring{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-12">
+        <h2 class="mb-0">
+            <i class="fas fa-file-alt"></i> System Logs
+        </h2>
+        <small class="text-muted">View and search system logs</small>
+    </div>
+</div>
+
+<div class="card shadow-sm mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Log Type</label>
+                <select name="type" class="form-select">
+                    <option value="all" {% if log_type == 'all' %}selected{% endif %}>All</option>
+                    <option value="SYSLOG" {% if log_type == 'SYSLOG' %}selected{% endif %}>Syslog</option>
+                    <option value="AUTH" {% if log_type == 'AUTH' %}selected{% endif %}>Auth</option>
+                    <option value="DMESG" {% if log_type == 'DMESG' %}selected{% endif %}>Dmesg</option>
+                </select>
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">&nbsp;</label>
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        {% if logs %}
+            <table class="table table-hover mb-0 small">
+                <thead class="table-light">
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>Type</th>
+                        <th>Level</th>
+                        <th>Process</th>
+                        <th>Message</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                        <tr>
+                            <td><small>{{ log.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</small></td>
+                            <td><small class="badge bg-secondary">{{ log.log_type }}</small></td>
+                            <td>
+                                {% if log.level == 'ERROR' %}
+                                    <small class="badge bg-danger">{{ log.level }}</small>
+                                {% elif log.level == 'WARNING' %}
+                                    <small class="badge bg-warning text-dark">{{ log.level }}</small>
+                                {% else %}
+                                    <small class="badge bg-info">{{ log.level }}</small>
+                                {% endif %}
+                            </td>
+                            <td><small>{{ log.process_name or '-' }}</small></td>
+                            <td><small>{{ log.message[:100] }}{% if log.message|length > 100 %}...{% endif %}</small></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination -->
+            {% if total_pages > 1 %}
+                <nav class="p-3 border-top">
+                    <ul class="pagination mb-0 justify-content-center">
+                        {% if page > 1 %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1&type={{ log_type }}">First</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page - 1 }}&type={{ log_type }}">Previous</a>
+                            </li>
+                        {% endif %}
+
+                        {% for p in range(max(1, page - 2), min(total_pages + 1, page + 3)) %}
+                            <li class="page-item {% if p == page %}active{% endif %}">
+                                <a class="page-link" href="?page={{ p }}&type={{ log_type }}">{{ p }}</a>
+                            </li>
+                        {% endfor %}
+
+                        {% if page < total_pages %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page + 1 }}&type={{ log_type }}">Next</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ total_pages }}&type={{ log_type }}">Last</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+        {% else %}
+            <div class="p-5 text-center text-muted">
+                <i class="fas fa-inbox fa-4x mb-3 opacity-50"></i>
+                <h4>No Logs Found</h4>
+                <p>Try adjusting your filters</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
